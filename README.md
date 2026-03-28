@@ -43,3 +43,53 @@ graph LR
     Memory --> Logic{Conflict Found?}
     Logic -->|Yes| Alert[👻 GHOST ALERT: Cites Slack history]
     Logic -->|No| Pass[✅ CLEAN: No constraints violated]
+
+
+1. The Success Path
+Input:
+
+Exporting users via ANALYTICS_REPLICA_URL
+
+Output:
+
+✅ Ghost Review: Clean! No conflicts detected.
+
+2. The Violation (The "Aha" Moment)
+Input:
+
+Running pandas script against PRODUCTION_PRIMARY_URL for marketing export.
+
+Output:
+
+👻 GHOST REVIEW ALERT 👻
+Constraint Violated: Ad-hoc scripts are banned from the Primary DB.
+Reasoning: Mandated on Nov 14, 2024, to prevent row-level locking.
+Evidence: [Link to Slack Thread #9912]
+
+🚀 Running the Local Demo
+To run the standalone CLI demo of the Ghost Review kill chain on your local machine:
+
+1. Clone & Branch
+bash
+git clone <your-repo-url>
+cd ContextCortex
+# Switch to the dedicated demo environment
+git checkout demov1
+2. Set up the Python Environment
+bash
+python3 -m venv venv
+source venv/bin/activate
+# Install the core microservice dependencies
+pip install fastapi uvicorn httpx pydantic python-dotenv
+3. Boot the Historian Memory Service
+Open your first terminal window and start the API:
+
+bash
+MEMORY_SERVICE_URL=http://localhost:8010 PYTHONPATH=. python3 -m services.memory.app.main
+(Leave this running in the background).
+
+4. Launch the Ghost Review CLI
+Open a second terminal window (ensure your virtual environment is activated) and run:
+
+bash
+python3 scripts/interactive_demo.py
