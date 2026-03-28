@@ -366,4 +366,44 @@ workflow:
       targetPosition: left
       type: custom
       width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: Context Synthesizer
+        model:
+          completion_params:
+            temperature: 0.3
+            max_tokens: 2048
+          mode: chat
+          name: deepseek-ai/DeepSeek-V3-0324
+          provider: langgenius/gmicloud/gmicloud
+        prompt_template:
+        - role: system
+          text: You are the Engineering Historian. Synthesize the raw Recall data
+            below into a clear answer. ALWAYS cite the decision maker, the date, and
+            the source (Slack/PR).
+        - id: 98431d3e-3f53-45cd-a9c0-2761aad91232
+          role: user
+          text: 'QUESTION: {{#1774726747150.original_query#}}
+
+            DATA: {{#1774727779257.body#}}'
+        selected: false
+        title: Context Synthesizer
+        type: llm
+        vision:
+          enabled: false
+      height: 130
+      id: recall_synthesizer
+      position:
+        x: 950.0
+        y: 18.494495838839796
+      positionAbsolute:
+        x: 950.0
+        y: 18.494495838839796
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
   rag_pipeline_variables: []
