@@ -444,4 +444,58 @@ workflow:
       targetPosition: left
       type: custom
       width: 241
+    - data:
+        answer: '{{#recall_synthesizer.text#}}'
+        selected: false
+        title: Answer (Why)
+        type: answer
+      height: 100
+      id: answer_why
+      position:
+        x: 1250.0
+        y: 18.494495838839796
+      positionAbsolute:
+        x: 1250.0
+        y: 18.494495838839796
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#check_formatter.text#}}'
+        selected: false
+        title: Answer (Check)
+        type: answer
+      height: 100
+      id: answer_check
+      position:
+        x: 1250.0
+        y: 250.22624360456072
+      positionAbsolute:
+        x: 1250.0
+        y: 250.22624360456072
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        answer: '{{#1774728388373.text#}}'
+        selected: false
+        title: Answer (General)
+        type: answer
+      height: 100
+      id: answer_general
+      position:
+        x: 950.0
+        y: 474.2712108085121
+      positionAbsolute:
+        x: 950.0
+        y: 474.2712108085121
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
   rag_pipeline_variables: []
