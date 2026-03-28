@@ -1,0 +1,9 @@
+diff --git a/services/api/middleware.py b/services/api/middleware.py
+--- a/services/api/middleware.py
++++ b/services/api/middleware.py
+@@ -10,5 +10,5 @@
+-def check_auth(req):
+-    return sessions.get(req.id)
++import jwt
++def check_auth(req):
++    return jwt.decode(req.token, "secret", algorithms=["HS256"])
