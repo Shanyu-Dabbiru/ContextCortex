@@ -125,6 +125,28 @@ workflow:
       targetHandle: target
       type: custom
       zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: llm
+      id: recall-to-synth
+      source: '1774727779257'
+      sourceHandle: source
+      target: recall_synthesizer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: synth-to-answer
+      source: recall_synthesizer
+      sourceHandle: source
+      target: answer_why
+      targetHandle: target
+      type: custom
+      zIndex: 0
     nodes:
     - data:
         selected: false
