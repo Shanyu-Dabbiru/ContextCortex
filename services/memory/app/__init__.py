@@ -1,1 +1,1 @@
-# Memory Service - ContextCortex
+# ContextCortex Memory Service
