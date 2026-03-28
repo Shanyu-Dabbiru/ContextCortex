@@ -1,0 +1,373 @@
+app:
+  description: ''
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: advanced-chat
+  name: Engineering Historian
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/gmicloud:0.0.2@a748a9d36808a2842a86da5c060f5b3dc74053af159046f9b2149391e930981a
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .GIF
+      - .WEBP
+      - .SVG
+      allowed_file_types:
+      - image
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 50
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      image:
+        enabled: false
+        number_limits: 3
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 3
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: code
+      id: 1774726138842-source-1774726747150-target
+      selected: false
+      source: '1774726138842'
+      sourceHandle: source
+      target: '1774726747150'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: code
+        targetType: if-else
+      id: 1774726747150-source-1774727519885-target
+      selected: false
+      source: '1774726747150'
+      sourceHandle: source
+      target: '1774727519885'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: if-else
+        targetType: http-request
+      id: 1774727519885-true-1774727779257-target
+      selected: false
+      source: '1774727519885'
+      sourceHandle: 'true'
+      target: '1774727779257'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: http-request
+      id: 1774727519885-c47213bf-67d4-4272-a40a-5805c28b00a4-17747285094730-target
+      source: '1774727519885'
+      sourceHandle: c47213bf-67d4-4272-a40a-5805c28b00a4
+      target: '17747285094730'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: 1774727519885-false-1774728388373-target
+      source: '1774727519885'
+      sourceHandle: 'false'
+      target: '1774728388373'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: User Input
+        type: start
+        variables:
+        - default: Code diff or file content for context.
+          hint: ''
+          label: file_context
+          options: []
+          placeholder: ''
+          required: false
+          type: paragraph
+          variable: file_context
+      height: 107
+      id: '1774726138842'
+      position:
+        x: -162.28176708392374
+        y: 229.22624360456072
+      positionAbsolute:
+        x: -162.28176708392374
+        y: 229.22624360456072
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        code: "import json\nimport re\n\ndef main(query: str, file_context: str) ->\
+          \ dict:\n    query_lower = (query or \"\").lower()\n    why_patterns = [r'\\\
+          bwhy\\b', r'\\breason\\b', r'\\bdecision\\b', r'\\bchose\\b']\n    check_patterns\
+          \ = [r'\\bcheck\\b', r'\\bviolat\\b', r'\\bconflict\\b', r'\\bconstraint\\\
+          b']\n\n    intent = \"general\"\n    if any(re.search(p, query_lower) for\
+          \ p in why_patterns):\n        intent = \"why_query\"\n    elif any(re.search(p,\
+          \ query_lower) for p in check_patterns):\n        intent = \"constraint_check\"\
+          \n\n    file_paths = re.findall(r'[\\w./]+\\.\\w+', (query or '') + ' '\
+          \ + (file_context or ''))\n    return {\n        \"intent\": intent,\n \
+          \       \"original_query\": query or \"\",\n        \"file_paths_json\"\
+          : json.dumps(file_paths)\n    }\n"
+        code_language: python3
+        desc: Intent Extraction
+        outputs:
+          file_paths_json:
+            children: null
+            type: string
+          intent:
+            children: null
+            type: string
+          original_query:
+            children: null
+            type: string
+        selected: false
+        title: Code
+        type: code
+        variables:
+        - value_selector:
+          - sys
+          - query
+          value_type: string
+          variable: query
+        - value_selector:
+          - '1774726138842'
+          - file_context
+          value_type: string
+          variable: file_context
+      height: 158
+      id: '1774726747150'
+      position:
+        x: 101.18703405034228
+        y: 250.22624360456072
+      positionAbsolute:
+        x: 101.18703405034228
+        y: 250.22624360456072
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: is
+            id: 58444c83-94b8-4422-ac0a-ed8643b60f53
+            value: why_query
+            varType: string
+            variable_selector:
+            - '1774726747150'
+            - intent
+          id: 'true'
+          logical_operator: and
+        - case_id: c47213bf-67d4-4272-a40a-5805c28b00a4
+          conditions:
+          - comparison_operator: is
+            id: 62ade8d6-a3c2-43f6-85a6-89bdb8837478
+            value: constraint_check
+            varType: string
+            variable_selector:
+            - '1774726747150'
+            - intent
+          id: c47213bf-67d4-4272-a40a-5805c28b00a4
+          logical_operator: and
+        selected: false
+        title: IF/ELSE
+        type: if-else
+      height: 194
+      id: '1774727519885'
+      position:
+        x: 368.0187745917624
+        y: 250.22624360456072
+      positionAbsolute:
+        x: 368.0187745917624
+        y: 250.22624360456072
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        authorization:
+          config:
+            api_key: msk_test_key
+            type: bearer
+          type: api-key
+        body:
+          data:
+          - id: key-value-59
+            key: ''
+            type: text
+            value: "{\n  \"query\": \"{{#1774726747150.original_query#}}\",\n  \"\
+              scope\": {\n    \"types\": [\"decision\", \"thread\"],\n    \"depth\"\
+              : 3\n  }\n}\n"
+          type: json
+        desc: HydraDB Recall
+        headers: Content-Type:application/json
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: HydraDB Recall
+        type: http-request
+        url: https://nontraceable-dia-indiscernibly.ngrok-free.dev/api/v1/recall
+        variables: []
+      height: 179
+      id: '1774727779257'
+      position:
+        x: 663.986847148048
+        y: 18.494495838839796
+      positionAbsolute:
+        x: 663.986847148048
+        y: 18.494495838839796
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        authorization:
+          config:
+            api_key: msk_test_key
+            type: bearer
+          type: api-key
+        body:
+          data:
+          - id: key-value-59
+            key: ''
+            type: text
+            value: "{\n  \"code_diff\": \"{{#1774726138842.file_context#}}\",\n  \"\
+              file_paths\": {{#1774726747150.file_paths_json#}}\n}\n"
+          type: json
+        desc: HydraDB Check
+        headers: Content-Type:application/json
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 100
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 0
+          max_read_timeout: 0
+          max_write_timeout: 0
+        title: HydraDB Check
+        type: http-request
+        url: https://nontraceable-dia-indiscernibly.ngrok-free.dev/api/v1/check
+        variables: []
+      height: 179
+      id: '17747285094730'
+      position:
+        x: 663.986847148048
+        y: 250.22624360456072
+      positionAbsolute:
+        x: 663.986847148048
+        y: 250.22624360456072
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: Handles greeting and general questions.
+        model:
+          completion_params:
+            temperature: 0.7
+          mode: chat
+          name: deepseek-ai/DeepSeek-V3-0324
+          provider: langgenius/gmicloud/gmicloud
+        prompt_template:
+        - role: system
+          text: You are the Engineering Historian. For general queries, be helpful
+            and mention you can answer 'Why?' questions using graph memory.
+        - id: 98431d3e-3f53-45cd-a9c0-2761aad91232
+          role: user
+          text: '{{#1774726747150.original_query#}}'
+        selected: false
+        title: LLM
+        type: llm
+        vision:
+          enabled: false
+      height: 130
+      id: '1774728388373'
+      position:
+        x: 663.986847148048
+        y: 474.2712108085121
+      positionAbsolute:
+        x: 663.986847148048
+        y: 474.2712108085121
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+  rag_pipeline_variables: []
