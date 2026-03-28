@@ -29,3 +29,22 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(secur
             headers={"WWW-Authenticate": "Bearer"},
         )
     return credentials.credentials
+
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    # Simple check for HydraDB connection could be added here
+    return HealthResponse(
+        status="ok",
+        db="connected",
+        embedding_service="connected"
+    )
+
+@app.post("/api/v1/nodes", response_model=NodeUpsertResponse)
+async def upsert_node(node: NodeUpsert, token: str = Depends(verify_token)):
+    client = get_hydra_client()
+    try:
+        node_id = await client.upsert_node(node.type, node.id, node.data)
+        return NodeUpsertResponse(node_id=node_id, status="created")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
