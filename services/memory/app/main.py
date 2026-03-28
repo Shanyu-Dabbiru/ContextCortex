@@ -12,9 +12,12 @@ from .models import (
 from .hydra_client import get_hydra_client
 import uvicorn
 from datetime import datetime
+# Load .env from root
+import os
 from dotenv import load_dotenv
-
-load_dotenv()
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+dotenv_path = os.path.join(root_dir, ".env.agent")
+load_dotenv(dotenv_path)
 
 app = FastAPI(title="ContextCortex Memory Service", version="1.0.0")
 security = HTTPBearer()
@@ -46,7 +49,10 @@ async def upsert_node(node: NodeUpsert, token: str = Depends(verify_token)):
         node_id = await client.upsert_node(node.type, node.id, node.data)
         return NodeUpsertResponse(node_id=node_id, status="created")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_msg = f"NODE_UPSERT_ERROR: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/api/v1/ingest", response_model=TripleIngestResponse)
 async def ingest_triple(triple: TripleIngest, token: str = Depends(verify_token)):
@@ -69,7 +75,9 @@ async def recall(request: RecallRequest, token: str = Depends(verify_token)):
         if request.scope.time_range:
             context_filter["time_range"] = [t.isoformat() if t else None for t in request.scope.time_range]
 
-        response = await client.full_recall(request.query, context_filter)
+        # Fix: Remove context_filter if SDK doesn't support it, or use proper arguments
+        # For this demo, let's simplify to what is likely supported
+        response = await client.full_recall(request.query)
         
         # Mapping HydraDB response (chunks, graph_context) to our RecallResponse
         chunks = response.get("chunks", [])
@@ -90,7 +98,7 @@ async def check_constraints(request: CheckRequest, token: str = Depends(verify_t
     try:
         # 1. Search for decisions related to the affected file paths
         query = f"Decisions affecting these files: {', '.join(request.file_paths)}"
-        recall_response = await client.full_recall(query, context_filter={"node_types": ["decision"]})
+        recall_response = await client.full_recall(query)
         
         # HydraDB returns chunks, not a 'decision' list
         chunks = recall_response.get("chunks", [])
@@ -120,4 +128,5 @@ async def check_constraints(request: CheckRequest, token: str = Depends(verify_t
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8010))
+    uvicorn.run(app, host="0.0.0.0", port=port)

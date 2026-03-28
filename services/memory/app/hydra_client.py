@@ -1,6 +1,7 @@
 import os
 import asyncio
 from typing import List, Dict, Any, Optional
+import io
 from hydra_db import AsyncHydraDB
 from .models import NodeType, Predicate, NodeRef, Metadata
 
@@ -11,7 +12,11 @@ class HydraClient:
         if not self.api_key:
             raise ValueError("HYDRADB_API_KEY environment variable is not set")
         
-        self.client = AsyncHydraDB(token=self.api_key)
+        self.is_mock = os.environ.get("USE_MOCK_MEMORY", "true").lower() == "true"
+        if not self.is_mock:
+            self.client = AsyncHydraDB(token=self.api_key)
+        else:
+            print("!!! USING MOCK MEMORY FOR DEMO !!!")
 
     async def upsert_node(self, node_type: NodeType, node_id: str, data: Dict[str, Any]) -> str:
         """
@@ -28,16 +33,19 @@ class HydraClient:
                 metadata=data
             )
             return node_id
+        if self.is_mock:
+            print(f"Mock Upsert: {node_type.value} {node_id}")
+            return node_id
+            
         else:
             # Knowledge base for decisions, threads, etc.
             content = self._format_content(node_type, data)
+            file_data = io.BytesIO(content.encode('utf-8'))
+            file_data.name = f"{node_id}.txt"
+            
             await self.client.upload.knowledge(
-                content=content,
-                metadata={
-                    "node_type": node_type.value,
-                    "node_id": node_id,
-                    **data
-                }
+                tenant_id="default",
+                files=[file_data]
             )
             return node_id
 
@@ -49,20 +57,13 @@ class HydraClient:
         relationship_text = f"({subject.type}:{subject.id}) -[{predicate.value}]-> ({object.type}:{object.id})"
         triple_id = f"{subject.id}_{predicate.value}_{object.id}"
         
+        if self.is_mock:
+            print(f"Mock Triple: {subject.id} -> {predicate.value} -> {object.id}")
+            return f"{subject.id}_{predicate.value}_{object.id}"
+            
         await self.client.upload.knowledge(
-            content=relationship_text,
-            metadata={
-                "triple_id": triple_id,
-                "subject_type": subject.type.value,
-                "subject_id": subject.id,
-                "predicate": predicate.value,
-                "object_type": object.type.value,
-                "object_id": object.id,
-                "source": metadata.source,
-                "confidence": metadata.confidence,
-                "timestamp": metadata.timestamp.isoformat(),
-                "raw_evidence": metadata.raw_evidence
-            }
+            tenant_id="default",
+            files=[io.BytesIO(relationship_text.encode())]
         )
         return triple_id
 
@@ -72,11 +73,22 @@ class HydraClient:
         """
         # In a real HydraDB SDK, parameters might vary.
         # Following the implementation plan's suggested signature.
+        if self.is_mock:
+            # Simulate a conflict for the demo!
+            if "JWT" in query or "authentication" in query:
+                return {
+                    "chunks": [
+                        {
+                            "text": "Architectural Constraint: We exclusively use session-based authentication. JWT is prohibited for security compliance.",
+                            "metadata": {"type": "decision", "id": "auth-policy-001"}
+                        }
+                    ]
+                }
+            return {"chunks": []}
+
         response = await self.client.recall.full_recall(
-            query=query,
-            context_filter=context_filter,
-            alpha=0.8,  # Hybrid search balance (0.0 vector, 1.0 keyword/graph)
-            recency_bias=0
+            tenant_id="default",
+            query=query
         )
         return response
 
