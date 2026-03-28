@@ -406,4 +406,42 @@ workflow:
       targetPosition: left
       type: custom
       width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        desc: Violation Formatter
+        model:
+          completion_params:
+            temperature: 0.2
+            max_tokens: 1024
+          mode: chat
+          name: deepseek-ai/DeepSeek-V3-0324
+          provider: langgenius/gmicloud/gmicloud
+        prompt_template:
+        - role: system
+          text: You are a code constraint checker. If the data shows a conflict, alert
+            the user with the Decision and Evidence. If clean, say "Safely aligned
+            with history."
+        - id: 98431d3e-3f53-45cd-a9c0-2761aad91232
+          role: user
+          text: 'DATA: {{#17747285094730.body#}}'
+        selected: false
+        title: Violation Formatter
+        type: llm
+        vision:
+          enabled: false
+      height: 130
+      id: check_formatter
+      position:
+        x: 950.0
+        y: 250.22624360456072
+      positionAbsolute:
+        x: 950.0
+        y: 250.22624360456072
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
   rag_pipeline_variables: []
