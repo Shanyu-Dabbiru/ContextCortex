@@ -169,6 +169,17 @@ workflow:
       targetHandle: target
       type: custom
       zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: general-to-answer
+      source: '1774728388373'
+      sourceHandle: source
+      target: answer_general
+      targetHandle: target
+      type: custom
+      zIndex: 0
     nodes:
     - data:
         selected: false
