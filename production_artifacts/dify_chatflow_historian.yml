@@ -1,0 +1,411 @@
+##############################################################################
+# ContextCortex — Engineering Historian Chatflow
+# Dify DSL v1.13 | Chatflow Mode (advanced-chat)
+#
+# FIXED: GAP-01 (JSON blob as query), GAP-02 (file_path singular),
+#        GAP-03 (general intent dead-end), GAP-04 (fragile contains),
+#        GAP-10 (double auth), GAP-11 (sys.query vs user_query)
+#
+# FLOW:
+#   Start (sys.query) → Intent Extractor (3 outputs) → Question Classifier
+#     → [Why]    → HydraDB Recall → Context Synthesizer → Answer
+#     → [Check]  → HydraDB Check  → Violation Formatter → Answer
+#     → [General] → General Responder → Answer
+##############################################################################
+
+app:
+  name: "Engineering Historian"
+  description: "Relational Recall agent — answers 'Why?' with graph-backed evidence and proactively flags constraint violations."
+  icon: "🧠"
+  icon_background: "#1a1a2e"
+  mode: "advanced-chat"
+
+model_config:
+  provider: "openai_api_compatible"
+  model: "kimi-k2"
+  mode: "chat"
+  completion_params:
+    temperature: 0.3
+    max_tokens: 4096
+    top_p: 0.9
+
+# ===========================================================================
+# WORKFLOW GRAPH
+# ===========================================================================
+workflow:
+  environment_variables:
+    - key: "MEMORY_SERVICE_URL"
+      value: "http://host.docker.internal:8000"
+    - key: "MEMORY_SERVICE_API_KEY"
+      value: ""  # Set after import
+
+  graph:
+    edges:
+      # Start → Intent Extraction
+      - source: "start"
+        sourceHandle: "source"
+        target: "intent_extractor"
+        targetHandle: "target"
+      # Intent Extraction → Question Classifier (replaces IF/ELSE)
+      - source: "intent_extractor"
+        sourceHandle: "source"
+        target: "question_classifier"
+        targetHandle: "target"
+      # Classifier → 3 branches
+      - source: "question_classifier"
+        sourceHandle: "class-1"    # why_query
+        target: "hydradb_recall"
+        targetHandle: "target"
+      - source: "question_classifier"
+        sourceHandle: "class-2"    # constraint_check
+        target: "hydradb_check"
+        targetHandle: "target"
+      - source: "question_classifier"
+        sourceHandle: "class-3"    # general
+        target: "general_responder"
+        targetHandle: "target"
+      # Recall → Synthesizer → Answer
+      - source: "hydradb_recall"
+        sourceHandle: "source"
+        target: "context_synthesizer"
+        targetHandle: "target"
+      - source: "context_synthesizer"
+        sourceHandle: "source"
+        target: "answer_why"
+        targetHandle: "target"
+      # Check → Formatter → Answer
+      - source: "hydradb_check"
+        sourceHandle: "source"
+        target: "violation_formatter"
+        targetHandle: "target"
+      - source: "violation_formatter"
+        sourceHandle: "source"
+        target: "answer_check"
+        targetHandle: "target"
+      # General → Answer
+      - source: "general_responder"
+        sourceHandle: "source"
+        target: "answer_general"
+        targetHandle: "target"
+
+    nodes:
+      # =====================================================================
+      # NODE 0: START
+      # Uses sys.query (Dify built-in) for chat input.
+      # file_context is an optional input for code diffs.
+      # =====================================================================
+      - data:
+          title: "Start"
+          type: "start"
+          variables:
+            - variable: "file_context"
+              label: "File Context (code diff)"
+              type: "paragraph"
+              required: false
+              max_length: 5000
+        id: "start"
+        position: { x: 80, y: 280 }
+        type: "start"
+
+      # =====================================================================
+      # NODE 1: INTENT EXTRACTOR (Code Node)
+      # FIX GAP-01: Outputs original_query as SEPARATE variable (not inside JSON)
+      # FIX GAP-04: Outputs intent as SEPARATE variable for clean comparison
+      # FIX GAP-11: Uses sys.query (Dify built-in), not custom user_query
+      # =====================================================================
+      - data:
+          title: "Intent Extractor"
+          type: "code"
+          variables:
+            - value_selector: ["sys", "query"]
+              variable: "query"
+            - value_selector: ["start", "file_context"]
+              variable: "file_context"
+          code_language: "python3"
+          code: |
+            import json
+            import re
+
+            def main(query: str, file_context: str) -> dict:
+                query_lower = (query or "").lower()
+
+                # Intent classification
+                why_patterns = [
+                    r'\bwhy\b', r'\breason\b', r'\bdecision\b', r'\bchose\b',
+                    r'\barchitecture\b', r'\bhistory\b', r'\bcontext\b',
+                    r'\bwho decided\b', r'\bwhen was\b', r'\boriginal\b'
+                ]
+                check_patterns = [
+                    r'\bcheck\b', r'\bviolat\b', r'\bconflict\b', r'\bconstraint\b',
+                    r'\bpr\b.*\breview\b', r'\bdiff\b', r'\bcommit\b.*\bsafe\b'
+                ]
+
+                intent = "general"
+                if any(re.search(p, query_lower) for p in why_patterns):
+                    intent = "why_query"
+                elif any(re.search(p, query_lower) for p in check_patterns):
+                    intent = "constraint_check"
+
+                # Entity extraction
+                file_paths = re.findall(r'[\w./]+\.\w+', (query or '') + ' ' + (file_context or ''))
+                user_mentions = re.findall(r'@(\w+)', query or '')
+
+                # FIX: Return SEPARATE output variables, not a single JSON blob
+                return {
+                    "intent": intent,
+                    "original_query": query or "",
+                    "file_paths_json": json.dumps(file_paths),
+                    "has_file_context": "true" if file_context else "false"
+                }
+          outputs:
+            - variable: "intent"
+              variable_type: "string"
+            - variable: "original_query"
+              variable_type: "string"
+            - variable: "file_paths_json"
+              variable_type: "string"
+            - variable: "has_file_context"
+              variable_type: "string"
+        id: "intent_extractor"
+        position: { x: 320, y: 280 }
+        type: "code"
+
+      # =====================================================================
+      # NODE 2: QUESTION CLASSIFIER (replaces IF/ELSE)
+      # FIX GAP-03: 3 explicit branches — why, check, general
+      # FIX GAP-04: Uses intent variable with exact match, not string contains
+      # =====================================================================
+      - data:
+          title: "Question Classifier"
+          type: "question-classifier"
+          model:
+            provider: "openai_api_compatible"
+            name: "kimi-k2"
+            mode: "chat"
+            completion_params:
+              temperature: 0.1
+              max_tokens: 64
+          query_variable_selector: ["intent_extractor", "original_query"]
+          classes:
+            - id: "class-1"
+              name: "Why / Decision Query"
+              description: "User asks WHY something was built a certain way, who made a decision, what the history is, or asks about architecture context."
+            - id: "class-2"
+              name: "Constraint Check"
+              description: "User wants to check if code changes violate historical decisions, review a PR for conflicts, or validate a diff."
+            - id: "class-3"
+              name: "General"
+              description: "Any other question that doesn't fit the above categories."
+        id: "question_classifier"
+        position: { x: 560, y: 280 }
+        type: "question-classifier"
+
+      # =====================================================================
+      # NODE 3A: HYDRADB RECALL (HTTP Request)
+      # FIX GAP-01: Uses original_query (natural language), not JSON blob
+      # FIX GAP-10: Single auth mechanism (authorization block only)
+      # =====================================================================
+      - data:
+          title: "HydraDB Recall"
+          type: "http-request"
+          method: "POST"
+          url: "{{#env.MEMORY_SERVICE_URL#}}/api/v1/recall"
+          headers: "Content-Type: application/json"
+          body:
+            type: "json"
+            data: |
+              {
+                "query": "{{#intent_extractor.original_query#}}",
+                "scope": {
+                  "types": ["decision", "thread", "user", "commit"],
+                  "depth": 3,
+                  "time_range": null
+                }
+              }
+          authorization:
+            type: "api-key"
+            config:
+              type: "bearer"
+              api_key: "{{#env.MEMORY_SERVICE_API_KEY#}}"
+          timeout:
+            connect: 5
+            read: 30
+            write: 10
+        id: "hydradb_recall"
+        position: { x: 800, y: 120 }
+        type: "http-request"
+
+      # =====================================================================
+      # NODE 3B: HYDRADB CHECK (HTTP Request)
+      # FIX GAP-02: Uses file_paths (plural array), not file_path
+      # FIX GAP-10: Consistent auth with recall node
+      # =====================================================================
+      - data:
+          title: "HydraDB Constraint Check"
+          type: "http-request"
+          method: "POST"
+          url: "{{#env.MEMORY_SERVICE_URL#}}/api/v1/check"
+          headers: "Content-Type: application/json"
+          body:
+            type: "json"
+            data: |
+              {
+                "code_diff": "{{#start.file_context#}}",
+                "file_paths": {{#intent_extractor.file_paths_json#}}
+              }
+          authorization:
+            type: "api-key"
+            config:
+              type: "bearer"
+              api_key: "{{#env.MEMORY_SERVICE_API_KEY#}}"
+          timeout:
+            connect: 5
+            read: 30
+            write: 10
+        id: "hydradb_check"
+        position: { x: 800, y: 320 }
+        type: "http-request"
+
+      # =====================================================================
+      # NODE 3C: GENERAL RESPONDER (LLM Node)
+      # FIX GAP-03: Handles general queries gracefully
+      # =====================================================================
+      - data:
+          title: "General Responder"
+          type: "llm"
+          model:
+            provider: "openai_api_compatible"
+            name: "kimi-k2"
+            mode: "chat"
+            completion_params:
+              temperature: 0.5
+              max_tokens: 512
+          prompt_template:
+            - role: "system"
+              text: |
+                You are the Engineering Historian for ContextCortex. You specialize in:
+                1. Answering "Why?" questions about architecture and code decisions
+                2. Checking code changes against historical constraints
+
+                The user asked a general question. Respond helpfully, and if relevant,
+                suggest they rephrase as a "Why?" or "Check" question for deeper results.
+
+                Keep responses concise and helpful.
+            - role: "user"
+              text: "{{#intent_extractor.original_query#}}"
+          context:
+            enabled: false
+          vision:
+            enabled: false
+        id: "general_responder"
+        position: { x: 800, y: 520 }
+        type: "llm"
+
+      # =====================================================================
+      # NODE 4A: CONTEXT SYNTHESIZER (LLM Node — GMI Cloud Kimi K2)
+      # =====================================================================
+      - data:
+          title: "Context Synthesizer"
+          type: "llm"
+          model:
+            provider: "openai_api_compatible"
+            name: "kimi-k2"
+            mode: "chat"
+            completion_params:
+              temperature: 0.3
+              max_tokens: 2048
+          prompt_template:
+            - role: "system"
+              text: |
+                You are the Engineering Historian for ContextCortex. Your job is to answer
+                "Why?" questions about code and architecture by citing SPECIFIC evidence
+                from the decision graph.
+
+                RULES:
+                1. ALWAYS cite the decision maker (name), the date, and the source (Slack thread/PR/meeting).
+                2. NEVER speculate. If the graph doesn't have evidence, say "No recorded decision found."
+                3. Format: **Decision** → **Evidence** → **Impact**.
+                4. Include deep links to original threads when available.
+            - role: "user"
+              text: |
+                QUESTION: {{#intent_extractor.original_query#}}
+
+                GRAPH CONTEXT (from Memory Service):
+                {{#hydradb_recall.body#}}
+
+                Synthesize the answer. Cite specific people, dates, and threads.
+          context:
+            enabled: false
+          vision:
+            enabled: false
+        id: "context_synthesizer"
+        position: { x: 1040, y: 120 }
+        type: "llm"
+
+      # =====================================================================
+      # NODE 4B: VIOLATION FORMATTER (LLM Node)
+      # =====================================================================
+      - data:
+          title: "Violation Formatter"
+          type: "llm"
+          model:
+            provider: "openai_api_compatible"
+            name: "kimi-k2"
+            mode: "chat"
+            completion_params:
+              temperature: 0.2
+              max_tokens: 1024
+          prompt_template:
+            - role: "system"
+              text: |
+                You are a code constraint checker. Given violation data from the decision
+                graph, format a clear, actionable alert.
+
+                FORMAT (if violations found):
+                ⚠️ **CONSTRAINT CONFLICT DETECTED**
+                - **Decision:** [title] by @[user] on [date]
+                - **Evidence:** [Slack thread / PR link]
+                - **Conflict:** [what the new code does vs. the decision]
+                - **Recommendation:** [what to do]
+
+                If no violations: "✅ No constraint conflicts found. This change looks safe."
+            - role: "user"
+              text: |
+                CONSTRAINT CHECK RESULTS:
+                {{#hydradb_check.body#}}
+
+                Format the results.
+          context:
+            enabled: false
+          vision:
+            enabled: false
+        id: "violation_formatter"
+        position: { x: 1040, y: 320 }
+        type: "llm"
+
+      # =====================================================================
+      # NODE 5A/5B/5C: ANSWER NODES
+      # =====================================================================
+      - data:
+          title: "Answer (Why)"
+          type: "answer"
+          answer: "{{#context_synthesizer.text#}}"
+        id: "answer_why"
+        position: { x: 1280, y: 120 }
+        type: "answer"
+
+      - data:
+          title: "Answer (Check)"
+          type: "answer"
+          answer: "{{#violation_formatter.text#}}"
+        id: "answer_check"
+        position: { x: 1280, y: 320 }
+        type: "answer"
+
+      - data:
+          title: "Answer (General)"
+          type: "answer"
+          answer: "{{#general_responder.text#}}"
+        id: "answer_general"
+        position: { x: 1280, y: 520 }
+        type: "answer"
