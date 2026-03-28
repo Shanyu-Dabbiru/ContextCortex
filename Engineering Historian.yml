@@ -147,6 +147,28 @@ workflow:
       targetHandle: target
       type: custom
       zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: llm
+      id: check-to-synth
+      source: '17747285094730'
+      sourceHandle: source
+      target: check_formatter
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: answer
+      id: check-to-answer
+      source: check_formatter
+      sourceHandle: source
+      target: answer_check
+      targetHandle: target
+      type: custom
+      zIndex: 0
     nodes:
     - data:
         selected: false
