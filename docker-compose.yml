@@ -6,24 +6,11 @@ services:
       test: ["CMD", "redis-cli", "ping"]
     networks: [recall_net]
 
-  postgres:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_DB: cortex
-      POSTGRES_USER: cortex
-      POSTGRES_PASSWORD: cortex
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cortex"]
-    networks: [recall_net]
-
   memory-service:
     build: ./services/memory
     ports: ["8000:8000"]
     env_file: .env
     depends_on:
-      postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -39,9 +26,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks: [recall_net]
-
-volumes:
-  pgdata:
 
 networks:
   recall_net:
